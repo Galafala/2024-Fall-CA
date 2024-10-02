@@ -22,6 +22,17 @@ void printBinary(uint32_t num) {
     printf("\n");
 }
 
+void printNumber(uint32_t num) {
+  union {
+    float f;
+    uint32_t i;
+  } n = { .i = num };
+
+  printf("Number: %f\n", n.f);
+  printf("Binary: ");
+  printBinary(n.i);
+}
+
 // fabs(guess * guess - n)
 uint32_t squareDifference(uint32_t guess, uint32_t n) 
 {
@@ -34,7 +45,6 @@ uint32_t squareDifference(uint32_t guess, uint32_t n)
   uint32_t guess_mantissa = guess & MANTISSA_MASK | 0x00800000; // 23 bits for mantissa and add the implicit 1
 
   // Square the number by doubling the exponent and squaring the mantissa
-  guess_exponent = (guess_exponent - EXPONENT_BIAS); // Double the exponent
   guess_exponent = ((guess_exponent - EXPONENT_BIAS) << 1) + EXPONENT_BIAS; // Double the exponent
 
   // Square the mantissa
@@ -50,12 +60,19 @@ uint32_t squareDifference(uint32_t guess, uint32_t n)
   // Reconstruct guess^2 in IEEE 754 format
   uint32_t squared_guess = (guess_exponent << 23) | (squared_mantissa & MANTISSA_MASK);
 
+  union {
+    float f;
+    uint32_t i;
+  } squared_guess_union = { .i = squared_guess };
+
+  printf("guess^2: %f\n", squared_guess_union.f);
+
   /*
   guess^2 - n
   */
 
   // Extract exponent and mantissa of n
-  uint32_t n_exponent = (n & EXPONENT_MASK) >> 23;
+  int32_t n_exponent = (n & EXPONENT_MASK) >> 23;
   uint32_t n_mantissa = (n & MANTISSA_MASK) | 0x00800000;
 
   // Align exponents by shifting the mantissa of the smaller exponent number
@@ -115,14 +132,13 @@ int main(int argc, char const *argv[]) {
     uint32_t i;
   } n = { .f = strtof(argv[1], &endptr) };
 
-  printf("Number: %f\n", n.f);
-  printf("Binary: ");
-  printBinary(n.i);
-
   if (*endptr != '\0') {
     printf("Invalid input: %s\n", argv[1]);
     return 1;
   }
+  
+  printf("Input: %f\n", n.f);
+  printNumber(n.i);
 
   /*
   int mySqrt(int n) {
@@ -144,38 +160,28 @@ int main(int argc, char const *argv[]) {
     return 0;
   }
 
-  // Extracting sign, exponent and mantissa
-  uint32_t sign     =  n.i & SIGN_MASK; // 1 bit
-  int32_t exponent = (n.i & EXPONENT_MASK) >> 23; // 8 bits
-  uint32_t mantissa =  n.i & MANTISSA_MASK; // 23 bits
+  // guess = n / 2.0
+  uint32_t guess = n.i - 0x00800000;
 
-  // dividing the exponent by 2
-  exponent = ((exponent - EXPONENT_BIAS) >> 1) + EXPONENT_BIAS; // divide the exponent by 2
-
-  union 
-  {
-    float f;
-    uint32_t i;
-  } guess = { .i = sign | (exponent << 23) | mantissa };
-
-  printf("Initial guess: %f\n", guess.f);
-  printBinary(guess.i);
-
+  printf("\nGuess: \n");
+  printNumber(guess);
+  
   union 
   {
     float f;
     uint32_t i;
   } e = { .f = 0.01 };
 
-  printf("guess^2 - n: %d\n", squareDifference(guess.i, n.i));
-
-  // while (squareDifference(guess, n.f) > e.i) 
-  // {
-  //   guess = (guess + n.i / guess) / 2.0;
-  // }
-
+  union 
+  {
+    float f;
+    uint32_t i;
+  } guessMinusN = { .i = squareDifference(guess, n.i) };
 
 
+
+
+  printf("guess^2 - n: %f\n", guessMinusN.f);
    
   return 0;
 }
