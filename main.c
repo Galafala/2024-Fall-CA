@@ -19,7 +19,37 @@ void printBinary(uint32_t num) {
             printf(" ");
         }
     }
-    printf("\n");
+    printf("\n\n");
+}
+
+// Function to print a 32-bit number in binary form
+void printBinary32(uint32_t num) {
+    for (int i = 31; i >= 0; i--) {
+       uint32_t mask = 1 << i;  // Create a mask to isolate each bit
+       uint32_t bit = (num & mask) ? 1 : 0;  // Isolate the bit at position i
+        printf("%u", bit);
+
+        // Print a space after every 8 bits for readability
+        if (i % 8 == 0 && i != 0) {
+            printf(" ");
+        }
+    }
+    printf("\n\n");
+}
+
+// Function to print a 32-bit number in binary form
+void printBinary64(uint64_t num) {
+    for (int i = 63; i >= 0; i--) {
+       uint64_t mask = (uint64_t)1 << i;  // Create a mask to isolate each bit
+       uint64_t bit = (num & mask) ? 1 : 0;  // Isolate the bit at position i
+        printf("%llu", bit);
+
+        // Print a space after every 8 bits for readability
+        if (i % 8 == 0 && i != 0) {
+            printf(" ");
+        }
+    }
+    printf("\n\n");
 }
 
 void printNumber(uint32_t num) {
@@ -48,7 +78,8 @@ uint32_t squareDifference(uint32_t guess, uint32_t n)
   guess_exponent = ((guess_exponent - EXPONENT_BIAS) << 1) + EXPONENT_BIAS; // Double the exponent
 
   // Square the mantissa
-  uint32_t squared_mantissa = ((uint64_t)guess_mantissa * guess_mantissa) >> 41; // Squaring the mantissa
+  uint32_t squared_mantissa = ((uint64_t)guess_mantissa * guess_mantissa) >> 23; // Squaring the mantissa
+  uint64_t squared_mantissa64 = (uint64_t)guess_mantissa * guess_mantissa;
 
   // Normalize the mantissa if necessary (it must fit into 23 bits)
   while (squared_mantissa > 0x00FFFFFF) 
@@ -60,12 +91,8 @@ uint32_t squareDifference(uint32_t guess, uint32_t n)
   // Reconstruct guess^2 in IEEE 754 format
   uint32_t squared_guess = (guess_exponent << 23) | (squared_mantissa & MANTISSA_MASK);
 
-  union {
-    float f;
-    uint32_t i;
-  } squared_guess_union = { .i = squared_guess };
-
-  printf("guess^2: %f\n", squared_guess_union.f);
+  printf("Guess^2: \n");
+  printNumber(squared_guess);
 
   /*
   guess^2 - n
@@ -136,8 +163,8 @@ int main(int argc, char const *argv[]) {
     printf("Invalid input: %s\n", argv[1]);
     return 1;
   }
-  
-  printf("Input: %f\n", n.f);
+
+  printf("Input:");
   printNumber(n.i);
 
   /*
@@ -163,7 +190,7 @@ int main(int argc, char const *argv[]) {
   // guess = n / 2.0
   uint32_t guess = n.i - 0x00800000;
 
-  printf("\nGuess: \n");
+  printf("Guess: \n");
   printNumber(guess);
   
   union 
@@ -177,9 +204,6 @@ int main(int argc, char const *argv[]) {
     float f;
     uint32_t i;
   } guessMinusN = { .i = squareDifference(guess, n.i) };
-
-
-
 
   printf("guess^2 - n: %f\n", guessMinusN.f);
    

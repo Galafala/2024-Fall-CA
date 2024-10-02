@@ -4,7 +4,7 @@ TARGET = main
 
 # The default rule compiles and runs the program
 all: $(TARGET)
-	./$(TARGET) 8
+	./$(TARGET) 19
 
 # Rule to compile the main.c file into the main executable
 $(TARGET): main.c
