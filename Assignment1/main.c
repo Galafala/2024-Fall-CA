@@ -1,5 +1,5 @@
-#include <stdint.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 #define SIGN_MASK     0x80000000
@@ -116,15 +116,7 @@ uint32_t squareDifference(uint32_t guess, uint32_t n)
   }
   
   // Subtract mantissas
- uint32_t result_mantissa = 0;
-  if (squared_mantissa < n_mantissa) 
-  {
-    result_mantissa = n_mantissa - squared_mantissa;
-  } 
-  else 
-  {
-    result_mantissa = squared_mantissa - n_mantissa;
-  }
+  int32_t result_mantissa = n_mantissa > squared_mantissa ? (n_mantissa - squared_mantissa) : (squared_mantissa - n_mantissa);
 
   // Normalize the result mantissa if necessary
   while (result_mantissa < 0x00800000) 
