@@ -1,138 +1,249 @@
+#include <math.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "print_utils.h"
 
 #define SIGN_MASK 0x80000000
 #define EXPONENT_MASK 0x7F800000
 #define MANTISSA_MASK 0x007FFFFF
 #define EXPONENT_BIAS 127
+#define HIDDEN_BIT 0x00800000
 
-// Function to print a 32-bit number in binary form
-void printBinary(uint32_t num) {
-  for (int i = 31; i >= 0; i--) {
-    uint32_t mask = 1 << i;              // Create a mask to isolate each bit
-    uint32_t bit = (num & mask) ? 1 : 0; // Isolate the bit at position i
-    printf("%u", bit);
+typedef struct floatingPoint {
+  uint32_t sign;
+  int32_t exponent;
+  uint32_t mantissa;
+} floatingPoint;
 
-    // Print a space after every 8 bits for readability
-    if (i == 31 || i == 23) {
-      printf(" ");
-    }
+floatingPoint unpackFloat(uint32_t num) {
+  struct floatingPoint fp;
+
+  fp.sign = (num & SIGN_MASK);
+  fp.exponent = (num & EXPONENT_MASK) >> 23;
+  fp.mantissa = num & MANTISSA_MASK | HIDDEN_BIT;
+
+  return fp;
+};
+
+uint32_t multiplyAbsFloat(uint32_t a, uint32_t b) {
+  floatingPoint a_fp = unpackFloat(a);
+  floatingPoint b_fp = unpackFloat(b);
+
+  // Multiply mantissas (mantissa_a * mantissa_b)
+  uint64_t result_mantissa = ((uint64_t)a_fp.mantissa * b_fp.mantissa) >> 23;
+
+  // Add exponents (exponent_a + exponent_b - bias)
+  int32_t result_exponent = (a_fp.exponent + b_fp.exponent) - EXPONENT_BIAS;
+
+  // Normalize the result mantissa if necessary
+  while (result_mantissa > 0x00FFFFFF) {
+    result_mantissa >>= 1;
+    result_exponent++;
   }
-  printf("\n\n");
+
+  // Handle overflow in exponent (e.g., result too large)
+  if (result_exponent >= 255) {
+    // Overflow: return infinity
+    return (a_fp.sign) | EXPONENT_MASK;
+  }
+
+  // Reconstruct the result (sign, exponent, mantissa)
+  result_mantissa &= MANTISSA_MASK;  // Remove the hidden bit
+
+  uint32_t result = (a_fp.sign) | (result_exponent << 23) | result_mantissa;
+
+  return result;
 }
 
-// Function to print a 32-bit number in binary form
-void printBinary32(uint32_t num) {
-  for (int i = 31; i >= 0; i--) {
-    uint32_t mask = 1 << i;              // Create a mask to isolate each bit
-    uint32_t bit = (num & mask) ? 1 : 0; // Isolate the bit at position i
-    printf("%u", bit);
+// Function to subtract two floating-point numbers in IEEE 754 format, returning the absolute result
+uint32_t substractAbsFloat(uint32_t a, uint32_t b) {
+  floatingPoint a_fp = unpackFloat(a);
+  floatingPoint b_fp = unpackFloat(b);
 
-    // Print a space after every 8 bits for readability
-    if (i % 8 == 0 && i != 0) {
-      printf(" ");
+  if (a == b) {
+    return 0;
+  }
+
+  // Align exponents by shifting the mantissa of the smaller exponent number
+  if (a_fp.exponent > b_fp.exponent) {
+    int shift = a_fp.exponent - b_fp.exponent;
+    b_fp.mantissa >>= shift;
+    b_fp.exponent = a_fp.exponent;  // Align to the higher exponent
+  } else if (b_fp.exponent > a_fp.exponent) {
+    int shift = b_fp.exponent - a_fp.exponent;
+    a_fp.mantissa >>= shift;
+    a_fp.exponent = b_fp.exponent;  // Align to the higher exponent
+  }
+
+  // Ensure we subtract the smaller mantissa from the larger mantissa
+  uint32_t result_mantissa;
+  if (a_fp.mantissa >= b_fp.mantissa) {
+    result_mantissa = a_fp.mantissa - b_fp.mantissa;
+  } else {
+    result_mantissa = b_fp.mantissa - a_fp.mantissa;
+  }
+
+  // Normalize the result mantissa if necessary
+  if (result_mantissa != 0) {  // Check to avoid normalization on zero
+    while (result_mantissa < HIDDEN_BIT && a_fp.exponent > 0) {
+      result_mantissa <<= 1;
+      a_fp.exponent--;
     }
   }
-  printf("\n\n");
-}
 
-// Function to print a 32-bit number in binary form
-void printBinary64(uint64_t num) {
-  for (int i = 63; i >= 0; i--) {
-    uint64_t mask = (uint64_t)1 << i;    // Create a mask to isolate each bit
-    uint64_t bit = (num & mask) ? 1 : 0; // Isolate the bit at position i
-    printf("%llu", bit);
-
-    // Print a space after every 8 bits for readability
-    if (i % 8 == 0 && i != 0) {
-      printf(" ");
-    }
+  // Handle potential overflow (if result mantissa exceeds 23 bits)
+  while (result_mantissa > 0x00FFFFFF) {
+    result_mantissa >>= 1;
+    a_fp.exponent++;
   }
-  printf("\n\n");
+
+  // If exponent becomes zero, the number is denormalized
+  if (a_fp.exponent == 0) {
+    result_mantissa >>= 1;
+  }
+
+  // Remove the hidden leading 1 from the mantissa for normalized numbers
+  result_mantissa &= MANTISSA_MASK;
+
+  // Reconstruct the result in IEEE 754 format
+  uint32_t result = (a_fp.sign) | (a_fp.exponent << 23) | result_mantissa;
+
+  return result;
 }
 
-void printNumber(uint32_t num) {
-  union {
-    float f;
-    uint32_t i;
-  } n = {.i = num};
+uint32_t divideByTwo(uint32_t num) {
+  // Extract components of num
+  int32_t exponent = (num & EXPONENT_MASK) >> 23;        // 8 bits for exponent
+  uint32_t mantissa = num & MANTISSA_MASK | HIDDEN_BIT;  // 23 bits for mantissa and add the implicit 1
 
-  printf("Number: %f\n", n.f);
-  printf("Binary: ");
-  printBinary(n.i);
+  // Divide the number by halving the exponent
+  exponent--;
+
+  // Normalize the mantissa if necessary (it must fit into 23 bits)
+  while (mantissa > 0x00FFFFFF) {
+    mantissa >>= 1;
+    exponent++;
+  }
+
+  // Reconstruct the number in IEEE 754 format
+  uint32_t result = (exponent << 23) | (mantissa & MANTISSA_MASK);
+
+  return result;
 }
 
 // fabs(guess * guess - n)
 uint32_t squareDifference(uint32_t guess, uint32_t n) {
-  /*
-  guess^2
-  */
+  // Reconstruct guess^2 in IEEE 754 format
+  uint32_t squared_guess = multiplyAbsFloat(guess, guess);
+  uint32_t result = substractAbsFloat(squared_guess, n);
+  return result;
+}
 
-  // Extract components of guess
-  int32_t guess_exponent = (guess & EXPONENT_MASK) >> 23; // 8 bits for exponent
-  uint32_t guess_mantissa =
-      guess & MANTISSA_MASK |
-      0x00800000; // 23 bits for mantissa and add the implicit 1
+// Function to compare two floating-point numbers
+bool compare(uint32_t a, uint32_t b) {
+  floatingPoint a_fp = unpackFloat(a);
+  floatingPoint b_fp = unpackFloat(b);
 
-  // Square the number by doubling the exponent and squaring the mantissa
-  guess_exponent = ((guess_exponent - EXPONENT_BIAS) << 1) +
-                   EXPONENT_BIAS; // Double the exponent
-
-  // Square the mantissa
-  uint32_t squared_mantissa = ((uint64_t)guess_mantissa * guess_mantissa) >>
-                              23; // Squaring the mantissa
-  uint64_t squared_mantissa64 = (uint64_t)guess_mantissa * guess_mantissa;
-
-  // Normalize the mantissa if necessary (it must fit into 23 bits)
-  while (squared_mantissa > 0x00FFFFFF) {
-    squared_mantissa >>= 1;
-    guess_exponent++;
+  // Step 1: Compare signs
+  if (a_fp.sign != b_fp.sign) {
+    // If the signs are different, positive is always greater than negative
+    return a_fp.sign < b_fp.sign;
   }
 
-  // Reconstruct guess^2 in IEEE 754 format
-  uint32_t squared_guess =
-      (guess_exponent << 23) | (squared_mantissa & MANTISSA_MASK);
+  // Step 2: Compare exponents (after sign comparison)
+  if (a_fp.exponent > b_fp.exponent) {
+    return a_fp.sign == 0;  // If both are positive, greater exponent wins
+  } else if (a_fp.exponent < b_fp.exponent) {
+    return a_fp.sign != 0;  // If both are negative, smaller exponent wins
+  }
 
-  printf("Guess^2: \n");
-  printNumber(squared_guess);
+  // Step 3: Compare mantissas (if signs and exponents are the same)
+  if (a_fp.mantissa > b_fp.mantissa) {
+    return a_fp.sign == 0;  // For positive numbers, larger mantissa is greater
+  } else if (a_fp.mantissa < b_fp.mantissa) {
+    return a_fp.sign != 0;  // For negative numbers, smaller mantissa is greater
+  }
 
-  /*
-  guess^2 - n
-  */
+  // If everything is the same, they are equal
+  return false;
+}
 
-  // Extract exponent and mantissa of n
-  int32_t n_exponent = (n & EXPONENT_MASK) >> 23;
-  uint32_t n_mantissa = (n & MANTISSA_MASK) | 0x00800000;
+uint32_t floatAbsAdd(uint32_t a, uint32_t b) {
+  floatingPoint a_fp = unpackFloat(a);
+  floatingPoint b_fp = unpackFloat(b);
 
   // Align exponents by shifting the mantissa of the smaller exponent number
-  if (guess_exponent > n_exponent) {
-    int shift = guess_exponent - n_exponent;
-    n_mantissa >>= shift;
-  } else if (n_exponent > guess_exponent) {
-    int shift = n_exponent - guess_exponent;
-    squared_mantissa >>= shift;
-    guess_exponent = n_exponent; // Align to the higher exponent
+
+  if (a_fp.exponent > b_fp.exponent) {
+    int shift = a_fp.exponent - b_fp.exponent;
+    b_fp.mantissa >>= shift;
+    b_fp.exponent = a_fp.exponent;  // Align to the higher exponent
+  } else if (b_fp.exponent > a_fp.exponent) {
+    int shift = b_fp.exponent - a_fp.exponent;
+    a_fp.mantissa >>= shift;
+    a_fp.exponent = b_fp.exponent;  // Align to the higher exponent
   }
 
-  // Subtract mantissas
-  int32_t result_mantissa = n_mantissa > squared_mantissa
-                                ? (n_mantissa - squared_mantissa)
-                                : (squared_mantissa - n_mantissa);
+  // Add mantissas
+  uint32_t result_mantissa = a_fp.mantissa + b_fp.mantissa;
 
   // Normalize the result mantissa if necessary
-  while (result_mantissa < 0x00800000) {
+  while (result_mantissa < 0x00800000 && result_mantissa > 0) {
     result_mantissa <<= 1;
-    guess_exponent--;
+    a_fp.exponent--;
   }
 
   while (result_mantissa > 0x00FFFFFF) {
     result_mantissa >>= 1;
-    guess_exponent++;
+    a_fp.exponent++;
   }
 
   // Reconstruct the result in IEEE 754 format
-  uint32_t result = (guess_exponent << 23) | (result_mantissa & MANTISSA_MASK);
+  uint32_t result = (a_fp.sign) | (a_fp.exponent << 23) | (result_mantissa & MANTISSA_MASK);
+
+  return result;
+}
+
+uint32_t divisionAbsFloat(uint32_t a, uint32_t b) {
+  floatingPoint a_fp = unpackFloat(a);
+  floatingPoint b_fp = unpackFloat(b);
+
+  // Step 1: Divide mantissas (mantissa_a / mantissa_b)
+  uint64_t result_mantissa = ((uint64_t)a_fp.mantissa << 23) / b_fp.mantissa;
+
+  // Step 2: Subtract exponents (exponent_a - exponent_b + bias)
+  int32_t result_exponent = (a_fp.exponent - b_fp.exponent) + EXPONENT_BIAS;
+
+  // Step 3: Normalize the result mantissa if necessary
+  if (result_mantissa & HIDDEN_BIT) {
+    // If the hidden bit is set, we are already normalized
+  } else {
+    // Normalize: shift mantissa left until the hidden bit is restored
+    while ((result_mantissa & HIDDEN_BIT) == 0 && result_exponent > 0) {
+      result_mantissa <<= 1;
+      result_exponent--;
+    }
+  }
+
+  // Step 4: Handle edge case for denormalized numbers
+  if (result_exponent <= 0) {
+    // Denormalized result, shift mantissa to the right to fit exponent = 0
+    result_mantissa >>= (1 - result_exponent);
+    result_exponent = 0;
+  }
+
+  // Step 5: Handle overflow in exponent (e.g., result too large)
+  if (result_exponent >= 255) {
+    // Overflow: return infinity
+    return (a_fp.sign) | EXPONENT_MASK;
+  }
+
+  // Step 6: Reconstruct the result (sign, exponent, mantissa)
+  result_mantissa &= MANTISSA_MASK;  // Remove the hidden bit
+  uint32_t result = (a_fp.sign) | (result_exponent << 23) | result_mantissa;
 
   return result;
 }
@@ -158,22 +269,7 @@ int main(int argc, char const *argv[]) {
   printf("Input:\n");
   printNumber(n.i);
 
-  /*
-  int mySqrt(int n) {
-    if (n == 0 || n == 1) {
-        return n;
-    }
-
-    double guess = n / 2.0;
-    double e = 0.01;
-    while (fabs(guess * guess - n) > e) {
-        guess = (guess + n / guess) / 2.0;
-    }
-    return (int)guess;
-  }
-  */
-
-  if (n.f == 1.0) {
+  if (n.f == 1.0 || n.f == 0.0) {
     printf("%f is a valid perfect square.\n", n.f);
     return 0;
   }
@@ -181,20 +277,23 @@ int main(int argc, char const *argv[]) {
   // guess = n / 2.0
   uint32_t guess = n.i - 0x00800000;
 
-  printf("Guess: \n");
+  printf("guess: \n");
   printNumber(guess);
 
   union {
     float f;
     uint32_t i;
-  } e = {.f = 0.01};
+  } error = {.f = 0.0001};
 
-  union {
-    float f;
-    uint32_t i;
-  } guessMinusN = {.i = squareDifference(guess, n.i)};
+  while (compare(squareDifference(guess, n.i), error.i)) {
+    // guess = (guess + n / guess) / 2.0
+    uint32_t temp = divisionAbsFloat(n.i, guess);
+    guess = floatAbsAdd(guess, temp);
+    guess = divideByTwo(guess);
+  }
 
-  printf("guess^2 - n: %f\n", guessMinusN.f);
+  printf("Square root:\n");
+  printNumber(guess);
 
   return 0;
 }
