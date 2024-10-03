@@ -1,7 +1,7 @@
 # Define the compiler and the target executable
 CC = gcc
 TARGET = main
-SOURCE = main.c print_utils.c
+SOURCE = main.c print_utils.c float_arithmetic.c
 
 # Define the object files (by replacing .c with .o)
 OBJECTS = $(SOURCES:.c=.o)
