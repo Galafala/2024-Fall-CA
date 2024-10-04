@@ -1,7 +1,12 @@
 #include "float_utils.h"
 
-floatingPoint unpackFloat(uint32_t num) {
-  struct floatingPoint fp;
+#include <stdint.h>
+#include <stdio.h>
+
+#include "print_utils.h"
+
+FloatingPoint unpack_float(uint32_t num) {
+  struct FloatingPoint fp;
 
   fp.sign = (num & SIGN_MASK);
   fp.exponent = (num & EXPONENT_MASK) >> 23;
@@ -10,176 +15,150 @@ floatingPoint unpackFloat(uint32_t num) {
   return fp;
 };
 
-uint32_t addFloat(uint32_t a, uint32_t b) {
-  floatingPoint a_fp = unpackFloat(a);
-  floatingPoint b_fp = unpackFloat(b);
-
-  // Align exponents by shifting the mantissa of the smaller exponent number
-
-  if (a_fp.exponent > b_fp.exponent) {
-    int shift = a_fp.exponent - b_fp.exponent;
-    b_fp.mantissa >>= shift;
-    b_fp.exponent = a_fp.exponent;  // Align to the higher exponent
-  } else if (b_fp.exponent > a_fp.exponent) {
-    int shift = b_fp.exponent - a_fp.exponent;
-    a_fp.mantissa >>= shift;
-    a_fp.exponent = b_fp.exponent;  // Align to the higher exponent
+static inline int cbz32(uint32_t x) {
+  int count = 0;
+  for (int i = 0; i < 32; i++) {
+    if (x & (1U << i)) break;
+    count++;
   }
-
-  // Add mantissas
-  uint32_t result_mantissa = a_fp.mantissa + b_fp.mantissa;
-
-  // Normalize the result mantissa if necessary
-  while (result_mantissa < 0x00800000 && result_mantissa > 0) {
-    result_mantissa <<= 1;
-    a_fp.exponent--;
-  }
-
-  while (result_mantissa > 0x00FFFFFF) {
-    result_mantissa >>= 1;
-    a_fp.exponent++;
-  }
-
-  // Reconstruct the result in IEEE 754 format
-  uint32_t result = (a_fp.sign) | (a_fp.exponent << 23) | (result_mantissa & MANTISSA_MASK);
-
-  return result;
+  return count;
 }
 
-uint32_t divisionFloat(uint32_t a, uint32_t b) {
-  floatingPoint a_fp = unpackFloat(a);
-  floatingPoint b_fp = unpackFloat(b);
-
-  // Step 1: Divide mantissas (mantissa_a / mantissa_b)
-  uint64_t result_mantissa = ((uint64_t)a_fp.mantissa << 23) / b_fp.mantissa;
-
-  // Step 2: Subtract exponents (exponent_a - exponent_b + bias)
-  int32_t result_exponent = (a_fp.exponent - b_fp.exponent) + EXPONENT_BIAS;
-
-  // Step 3: Normalize the result mantissa if necessary
-  if (result_mantissa & HIDDEN_BIT) {
-    // If the hidden bit is set, we are already normalized
-  } else {
-    // Normalize: shift mantissa left until the hidden bit is restored
-    while ((result_mantissa & HIDDEN_BIT) == 0 && result_exponent > 0) {
-      result_mantissa <<= 1;
-      result_exponent--;
-    }
+static inline int cbz64(uint64_t x) {
+  int count = 0;
+  for (int i = 0; i < 64; i++) {
+    if (x & (1LLU << i)) break;
+    count++;
   }
-
-  // Step 4: Handle edge case for denormalized numbers
-  if (result_exponent <= 0) {
-    // Denormalized result, shift mantissa to the right to fit exponent = 0
-    result_mantissa >>= (1 - result_exponent);
-    result_exponent = 0;
-  }
-
-  // Step 5: Handle overflow in exponent (e.g., result too large)
-  if (result_exponent >= 255) {
-    // Overflow: return infinity
-    return (a_fp.sign) | EXPONENT_MASK;
-  }
-
-  // Step 6: Reconstruct the result (sign, exponent, mantissa)
-  result_mantissa &= MANTISSA_MASK;  // Remove the hidden bit
-  uint32_t result = (a_fp.sign) | (result_exponent << 23) | result_mantissa;
-
-  return result;
+  return count;
 }
 
-uint32_t fmul(uint32_t a, uint32_t b) {
-  floatingPoint a_fp = unpackFloat(a);
-  floatingPoint b_fp = unpackFloat(b);
-
-  // Multiply mantissas (mantissa_a * mantissa_b)
-  uint32_t result_mantissa = ((uint64_t)a_fp.mantissa * b_fp.mantissa) >> 23;
-
-  // Add exponents (exponent_a + exponent_b - bias)
-  int32_t result_exponent = (a_fp.exponent + b_fp.exponent) - EXPONENT_BIAS;
-
-  // Normalize the result mantissa if necessary
-  while (result_mantissa > 0x00FFFFFF) {
-    result_mantissa >>= 1;
-    result_exponent++;
+static inline int clz32(uint32_t x) {
+  int count = 0;
+  for (int i = 31; i >= 0; --i) {
+    if (x & (1U << i)) break;
+    count++;
   }
-
-  // Handle overflow in exponent (e.g., result too large)
-  if (result_exponent >= 255) {
-    // Overflow: return infinity
-    return (a_fp.sign) | EXPONENT_MASK;
-  }
-
-  // Reconstruct the result (sign, exponent, mantissa)
-  result_mantissa &= MANTISSA_MASK;  // Remove the hidden bit
-
-  uint32_t result = (a_fp.sign) | (result_exponent << 23) | result_mantissa;
-
-  return result;
+  return count;
 }
 
-// Function to subtract two floating-point numbers in IEEE 754 format, returning the absolute result
-uint32_t subtractFloat(uint32_t a, uint32_t b) {
-  floatingPoint a_fp = unpackFloat(a);
-  floatingPoint b_fp = unpackFloat(b);
-
-  if (a == b) {
-    return 0;
+static inline int clz64(uint64_t x) {
+  int count = 0;
+  for (int i = 63; i >= 0; --i) {
+    if (x & (1LLU << i)) break;
+    count++;
   }
-
-  // Align exponents by shifting the mantissa of the smaller exponent number
-  if (a_fp.exponent > b_fp.exponent) {
-    int shift = a_fp.exponent - b_fp.exponent;
-    b_fp.mantissa >>= shift;
-    b_fp.exponent = a_fp.exponent;  // Align to the higher exponent
-  } else if (b_fp.exponent > a_fp.exponent) {
-    int shift = b_fp.exponent - a_fp.exponent;
-    a_fp.mantissa >>= shift;
-    a_fp.exponent = b_fp.exponent;  // Align to the higher exponent
-  }
-
-  // Ensure we subtract the smaller mantissa from the larger mantissa
-  uint32_t result_mantissa;
-  if (a_fp.mantissa >= b_fp.mantissa) {
-    result_mantissa = a_fp.mantissa - b_fp.mantissa;
-  } else {
-    result_mantissa = b_fp.mantissa - a_fp.mantissa;
-  }
-
-  // Normalize the result mantissa if necessary
-  if (result_mantissa != 0) {  // Check to avoid normalization on zero
-    while (result_mantissa < HIDDEN_BIT && a_fp.exponent > 0) {
-      result_mantissa <<= 1;
-      a_fp.exponent--;
-    }
-  }
-
-  // Handle potential overflow (if result mantissa exceeds 23 bits)
-  while (result_mantissa > 0x00FFFFFF) {
-    result_mantissa >>= 1;
-    a_fp.exponent++;
-  }
-
-  // If exponent becomes zero, the number is denormalized
-  if (a_fp.exponent == 0) {
-    result_mantissa >>= 1;
-  }
-
-  // Remove the hidden leading 1 from the mantissa for normalized numbers
-  result_mantissa &= MANTISSA_MASK;
-
-  // Reconstruct the result in IEEE 754 format
-  uint32_t result = (a_fp.sign) | (a_fp.exponent << 23) | result_mantissa;
-
-  return result;
+  return count;
 }
 
 float fdiv2(float n) {
-  union {
-    float f;
-    uint32_t i;
-  } n_u = {.f = n};
+  uint32_t num = *(uint32_t*)&n;
 
-  n_u.i -= 0x00800000;
+  num -= 0x00800000;
 
-  return n_u.f;
+  return *(float*)&num;
+}
+
+float fsquare(float n) {
+  uint32_t num = *(uint32_t*)&n;
+
+  FloatingPoint n_fp = unpack_float(num);
+  n_fp.sign = 0;
+  n_fp.exponent = (n_fp.exponent << 1) - EXPONENT_BIAS;
+  uint64_t m = (uint64_t)n_fp.mantissa * n_fp.mantissa;
+  int shift = 40 - clz64(m);  //
+  int digit = 64 - clz64(m);
+  int norm_shift = digit - 47;
+  // Calculate the shift to normalize the mantissa. 47 is because the mantissa is a number with 23 numbers after the point. Therefore, if two mantissas are
+  // multiplied, the result will have 46 numbers after points. If the result is normalized, there is 1 number before the point. Therefore, the shift is 47.
+  // However, if there is 2 number before the point, the norm_shift is 48 - 47 = 1.
+  n_fp.mantissa = (uint32_t)(m >> shift);
+  n_fp.mantissa &= MANTISSA_MASK;
+  n_fp.exponent += norm_shift;
+
+  num = (n_fp.sign) | (n_fp.exponent << 23) | (n_fp.mantissa);
+
+  return *(float*)&num;
+}
+
+// Function to compare two floating-point numbers
+int fcmp(float a, float b) {
+  uint32_t ai = *(uint32_t*)&a;
+  uint32_t bi = *(uint32_t*)&b;
+
+  if (ai == bi) {
+    return 0;  // equal
+  } else if (ai > bi) {
+    return 1;  // greater
+  }
+  return 2;  // smaller
+}
+
+float fadd(float a, float b) {
+  uint32_t ai = *(uint32_t*)&a;
+  uint32_t bi = *(uint32_t*)&b;
+
+  if ((ai & NON_SIGN_MASK) < (bi & NON_SIGN_MASK)) {
+    uint32_t tmp = ai;
+    ai = bi;
+    bi = tmp;
+  }
+
+  FloatingPoint a_fp = unpack_float(ai);
+  FloatingPoint b_fp = unpack_float(bi);
+
+  uint32_t align = a_fp.exponent - b_fp.exponent > 24 ? 24 : a_fp.exponent - b_fp.exponent;
+  b_fp.mantissa >>= align;
+
+  if (a_fp.sign != b_fp.sign) {
+    b_fp.mantissa = -b_fp.mantissa;  // negate b_fp.mantissa if signs are different
+  }
+  a_fp.mantissa += b_fp.mantissa;  // add mantissas
+
+  uint32_t renorm_shift = clz32(a_fp.mantissa);
+  if (renorm_shift > 8) {
+    renorm_shift = renorm_shift - 8;
+    a_fp.mantissa <<= renorm_shift;
+    a_fp.exponent -= renorm_shift;
+  } else {
+    renorm_shift = 8 - renorm_shift;
+    a_fp.mantissa >>= renorm_shift;
+    a_fp.exponent += renorm_shift;
+  }
+
+  uint32_t result = a_fp.sign | (a_fp.exponent << 23) | (a_fp.mantissa & MANTISSA_MASK);
+
+  return *(float*)&result;
+}
+
+int32_t idiv(int32_t a, int32_t b) {
+  uint32_t r = 0;
+  for (int i = 0; i < 32; i++) {
+    r <<= 1;
+    if (a - b >= 0) {
+      r |= 1;
+      a -= b;
+    }
+    a <<= 1;
+  }
+
+  return r;
+}
+
+float fdiv(float a, float b) {
+  uint32_t ai = *(uint32_t*)&a;
+  uint32_t bi = *(uint32_t*)&b;
+
+  FloatingPoint a_fp = unpack_float(ai);
+  FloatingPoint b_fp = unpack_float(bi);
+
+  a_fp.exponent -= b_fp.exponent;
+  a_fp.exponent += EXPONENT_BIAS;
+
+  a_fp.mantissa = idiv(a_fp.mantissa, b_fp.mantissa);
+  int shift = !(a_fp.mantissa & 0x80000000);  // shift if the most significant bit is 0
+
+  uint32_t result = a_fp.sign | ((a_fp.exponent - shift) << 23) | ((a_fp.mantissa >> 8 << shift) & MANTISSA_MASK);
+
+  return *(float*)&result;
 }
