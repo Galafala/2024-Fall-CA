@@ -15,4 +15,6 @@ void printBinary64(uint64_t num);
 // Function to print the float representation of a 32-bit number and its binary form
 void printNumber(uint32_t num);
 
+void fprint(float num);
+
 #endif  // PRINT_UTILS_H

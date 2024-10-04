@@ -14,7 +14,7 @@ void printBinary(uint32_t num) {
       printf(" ");
     }
   }
-  printf("\n\n");
+  printf("\n");
 }
 
 // Function to print a 32-bit number in binary form (standard format)
@@ -29,7 +29,7 @@ void printBinary32(uint32_t num) {
       printf(" ");
     }
   }
-  printf("\n\n");
+  printf("\n");
 }
 
 // Function to print a 64-bit number in binary form
@@ -44,7 +44,7 @@ void printBinary64(uint64_t num) {
       printf(" ");
     }
   }
-  printf("\n\n");
+  printf("\n");
 }
 
 // Function to print the float representation of a 32-bit number and its binary form
@@ -53,6 +53,18 @@ void printNumber(uint32_t num) {
     float f;
     uint32_t i;
   } n = {.i = num};
+
+  printf("Number: %f\n", n.f);
+  printf("Binary: ");
+  printBinary(n.i);
+}
+
+// Function to print the float representation of a 32-bit number and its binary form
+void fprint(float num) {
+  union {
+    float f;
+    uint32_t i;
+  } n = {.f = num};
 
   printf("Number: %f\n", n.f);
   printf("Binary: ");
