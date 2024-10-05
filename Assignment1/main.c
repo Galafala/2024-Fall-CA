@@ -8,20 +8,22 @@
 #include "print_utils.h"
 
 int main() {
-  float num = 25;
-
-  float a = 52.0;
-  float b = 2.0;
+  float num = 49;
 
   float x = fdiv2(num);
 
-  while (fabsf(fsquare(x) - num) > 0.0000001) {
+  while (fcmp(fsquare(x), num) == 1) {
     float temp = fdiv(num, x);
     x = fadd(x, temp);
     x = fdiv2(x);
-    fprint(x);
   }
+  // while (fsquare(x) - num > 0.0001) {
+  //   float temp = fdiv(num, x);
+  //   x = fadd(x, temp);
+  //   x = fdiv2(x);
+  // }
   printf("Square root: %f\n", x);
+  printf("Square root: %f\n", sqrt(num));
 
   return 0;
 }
