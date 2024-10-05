@@ -32,7 +32,18 @@ float fdiv2(float n) {
   return *(float*)&num;
 }
 
-static inline float getbit64(uint64_t num, int pos) { return (num >> (pos - 1)) & 1; }
+static inline float getbit32(uint32_t num, int pos) { return (num >> (pos - 1)) & 1; }
+
+uint32_t imul(uint32_t a, uint32_t b) {
+  uint32_t r = 0;
+  for (int i = 0; i < 24; i++) {
+    uint32_t mask = (b & 1) == 1 ? 0xFFFFFFFF : 0;
+    r = (r >> 1) + (a & mask);
+    b >>= 1;
+  }
+
+  return r;
+}
 
 float fsquare(float n) {
   uint32_t num = *(uint32_t*)&n;
@@ -40,12 +51,11 @@ float fsquare(float n) {
   FloatingPoint n_fp = unpack_float(num);
   n_fp.sign = 0;
   n_fp.exponent = (n_fp.exponent << 1) - EXPONENT_BIAS;
-  uint64_t m = (uint64_t)n_fp.mantissa * n_fp.mantissa;
+  uint32_t m = imul(n_fp.mantissa, n_fp.mantissa);
   // If the 48th bit is 1, then the result needs to be normalized
-  int norm_shift = getbit64(m, 48);
+  int norm_shift = getbit32(m, 25);
   // Shift the mantissa to the right by 23 bits. If the 48th bit is 1, shift by 24 bits.
-  n_fp.mantissa = (uint32_t)(m >> (23 + norm_shift));
-  n_fp.mantissa &= MANTISSA_MASK;
+  n_fp.mantissa = (m >> norm_shift) & MANTISSA_MASK;
   n_fp.exponent += norm_shift;
 
   num = (n_fp.sign) | (n_fp.exponent << 23) | (n_fp.mantissa);
@@ -53,7 +63,7 @@ float fsquare(float n) {
   return *(float*)&num;
 }
 
-// Function to compare two floating-point numbers
+// Function to compare two floating-point numbers, and only need to handle positive numbers
 int fcmp(float a, float b) {
   uint32_t ai = *(uint32_t*)&a;
   uint32_t bi = *(uint32_t*)&b;

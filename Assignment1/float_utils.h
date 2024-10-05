@@ -10,12 +10,10 @@
 #define EXPONENT_BIAS 127
 #define HIDDEN_BIT 0x00800000
 
-float fadd(float a, float b);
-float fmul(float a, float b);
-float fdiv(float a, float b);
 float fdiv2(float n);
 float fsquare(float n);
-int32_t idiv(int32_t a, int32_t b);
+float fadd(float a, float b);
+float fdiv(float a, float b);
 int fcmp(float a, float b);
 
 typedef struct FloatingPoint {
