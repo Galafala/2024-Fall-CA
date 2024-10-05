@@ -15,37 +15,10 @@ FloatingPoint unpack_float(uint32_t num) {
   return fp;
 };
 
-static inline int cbz32(uint32_t x) {
-  int count = 0;
-  for (int i = 0; i < 32; i++) {
-    if (x & (1U << i)) break;
-    count++;
-  }
-  return count;
-}
-
-static inline int cbz64(uint64_t x) {
-  int count = 0;
-  for (int i = 0; i < 64; i++) {
-    if (x & (1LLU << i)) break;
-    count++;
-  }
-  return count;
-}
-
 static inline int clz32(uint32_t x) {
   int count = 0;
   for (int i = 31; i >= 0; --i) {
     if (x & (1U << i)) break;
-    count++;
-  }
-  return count;
-}
-
-static inline int clz64(uint64_t x) {
-  int count = 0;
-  for (int i = 63; i >= 0; --i) {
-    if (x & (1LLU << i)) break;
     count++;
   }
   return count;
@@ -59,6 +32,8 @@ float fdiv2(float n) {
   return *(float*)&num;
 }
 
+static inline float getbit64(uint64_t num, int pos) { return (num >> (pos - 1)) & 1; }
+
 float fsquare(float n) {
   uint32_t num = *(uint32_t*)&n;
 
@@ -66,13 +41,10 @@ float fsquare(float n) {
   n_fp.sign = 0;
   n_fp.exponent = (n_fp.exponent << 1) - EXPONENT_BIAS;
   uint64_t m = (uint64_t)n_fp.mantissa * n_fp.mantissa;
-  int shift = 40 - clz64(m);  //
-  int digit = 64 - clz64(m);
-  int norm_shift = digit - 47;
-  // Calculate the shift to normalize the mantissa. 47 is because the mantissa is a number with 23 numbers after the point. Therefore, if two mantissas are
-  // multiplied, the result will have 46 numbers after points. If the result is normalized, there is 1 number before the point. Therefore, the shift is 47.
-  // However, if there is 2 number before the point, the norm_shift is 48 - 47 = 1.
-  n_fp.mantissa = (uint32_t)(m >> shift);
+  // If the 48th bit is 1, then the result needs to be normalized
+  int norm_shift = getbit64(m, 48);
+  // Shift the mantissa to the right by 23 bits. If the 48th bit is 1, shift by 24 bits.
+  n_fp.mantissa = (uint32_t)(m >> (23 + norm_shift));
   n_fp.mantissa &= MANTISSA_MASK;
   n_fp.exponent += norm_shift;
 
