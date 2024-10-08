@@ -7,21 +7,29 @@
 #include "fp32_utils.h"
 #include "print_utils.h"
 
+int condition(float a, float b) {
+  b = fnegative(b);
+  float sum = fadd(fsquare(a), b);
+  sum = fabsf(sum);
+  return fcmp(sum, 0.1) == 1;
+}
+
 int main() {
-  float num = 49;
-  float error = 0.01;
+  for (float i = 1; i < 100; i++) {
+    float num = fsquare(i);
+    float half = fdiv2(num);
 
-  float half = fdiv2(num);
+    while (condition(half, num)) {
+      half = fadd(half, fdiv(num, half));
+      half = fdiv2(half);
+    }
 
-  while (fcmp(fsquare(half), num) == 1) {
-    float diff = fdiv(num, half);
-    half = fadd(half, diff);
-    half = fdiv2(half);
+    bool is_equal = (num == fsquare(fp32_to_uint32(half)));
+    if (!is_equal) {
+      printf("Is num %d equal to half * half? %s\n", fp32_to_uint32(i), is_equal ? "true" : "false");
+      fprint(half);
+    }
   }
-
-  printf("Square root: %f\n", half);
-  printf("Square root: %f\n", sqrt(num));
-  printf("The square root of %f is %f\n", num, half);
 
   return 0;
 }

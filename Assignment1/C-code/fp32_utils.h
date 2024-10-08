@@ -14,7 +14,10 @@ float fdiv2(float n);
 float fsquare(float n);
 float fadd(float a, float b);
 float fdiv(float a, float b);
+float fabsf(float n);
+float fnegative(float n);
 int fcmp(float a, float b);
+uint32_t fp32_to_uint32(float n);
 
 typedef struct fp32 {
   uint32_t sign;
