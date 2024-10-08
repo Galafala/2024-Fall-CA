@@ -15,10 +15,12 @@ int main() {
 
   while (fcmp(fsquare(half), num) == 1) {
     float diff = fdiv(num, half);
-    diff = fadd(half, diff);
+    half = fadd(half, diff);
     half = fdiv2(half);
   }
 
+  printf("Square root: %f\n", half);
+  printf("Square root: %f\n", sqrt(num));
   printf("The square root of %f is %f\n", num, half);
 
   return 0;
