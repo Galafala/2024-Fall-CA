@@ -1,12 +1,12 @@
-#include "float_utils.h"
+#include "fp32_utils.h"
 
 #include <stdint.h>
 #include <stdio.h>
 
-#include "print_utils.h"
+static inline float getbit32(uint32_t num, int pos) { return (num >> (pos - 1)) & 1; }
 
-FloatingPoint unpack_float(uint32_t num) {
-  struct FloatingPoint fp;
+fp32 unpack_float(uint32_t num) {
+  struct fp32 fp;
 
   fp.sign = (num & SIGN_MASK);
   fp.exponent = (num & EXPONENT_MASK) >> 23;
@@ -24,15 +24,64 @@ static inline int clz32(uint32_t x) {
   return count;
 }
 
+static inline int cbz32(uint32_t x) {
+  int count = 0;
+  for (int i = 0; i < 32; ++i) {
+    if (x & (1U << i)) break;
+    count++;
+  }
+  return count;
+}
+
+uint32_t fp32_to_uint32(float n) {
+  uint32_t num = *(uint32_t *)&n;
+  fp32 fp = unpack_float(num);
+  fp.mantissa += getbit32(num, cbz32(fp.mantissa) + 1);  // Round to the nearest even number
+
+  int shift = 23 - (fp.exponent - 127);
+  if (shift > 0) {
+    fp.mantissa >>= shift;
+  } else {
+    fp.mantissa <<= -shift;
+  }
+
+  return fp.mantissa;
+}
+
+// Function to compare two floating-point numbers, and only need to handle positive numbers
+int fcmp(float a, float b) {
+  uint32_t ai = *(uint32_t *)&a;
+  uint32_t bi = *(uint32_t *)&b;
+
+  if (ai == bi) {
+    return 0;  // equal
+  } else if (ai > bi) {
+    return 1;  // greater
+  }
+  return 2;  // smaller
+}
+
+float fabsf(float x) {
+  uint32_t i = *(uint32_t *)&x;  // Read the bits of the float into an integer
+  i &= 0x7FFFFFFF;               // Clear the sign bit to get the absolute value
+  x = *(float *)&i;              // Write the modified bits back into the float
+  return x;
+}
+
+float fnegative(float x) {
+  uint32_t i = *(uint32_t *)&x;  // Read the bits of the float into an integer
+  i ^= 0x80000000;               // Toggle the sign bit to get the negative value
+  x = *(float *)&i;              // Write the modified bits back into the float
+  return x;
+}
+
 float fdiv2(float n) {
-  uint32_t num = *(uint32_t*)&n;
+  uint32_t num = *(uint32_t *)&n;
 
   num -= 0x00800000;
 
-  return *(float*)&num;
+  return *(float *)&num;
 }
-
-static inline float getbit32(uint32_t num, int pos) { return (num >> (pos - 1)) & 1; }
 
 uint32_t imul(uint32_t a, uint32_t b) {
   uint32_t r = 0;
@@ -46,9 +95,9 @@ uint32_t imul(uint32_t a, uint32_t b) {
 }
 
 float fsquare(float n) {
-  uint32_t num = *(uint32_t*)&n;
+  uint32_t num = *(uint32_t *)&n;
 
-  FloatingPoint n_fp = unpack_float(num);
+  fp32 n_fp = unpack_float(num);
   n_fp.sign = 0;
   n_fp.exponent = (n_fp.exponent << 1) - EXPONENT_BIAS;
   uint32_t m = imul(n_fp.mantissa, n_fp.mantissa);
@@ -60,25 +109,12 @@ float fsquare(float n) {
 
   num = (n_fp.sign) | (n_fp.exponent << 23) | (n_fp.mantissa);
 
-  return *(float*)&num;
-}
-
-// Function to compare two floating-point numbers, and only need to handle positive numbers
-int fcmp(float a, float b) {
-  uint32_t ai = *(uint32_t*)&a;
-  uint32_t bi = *(uint32_t*)&b;
-
-  if (ai == bi) {
-    return 0;  // equal
-  } else if (ai > bi) {
-    return 1;  // greater
-  }
-  return 2;  // smaller
+  return *(float *)&num;
 }
 
 float fadd(float a, float b) {
-  uint32_t ai = *(uint32_t*)&a;
-  uint32_t bi = *(uint32_t*)&b;
+  uint32_t ai = *(uint32_t *)&a;
+  uint32_t bi = *(uint32_t *)&b;
 
   if ((ai & NON_SIGN_MASK) < (bi & NON_SIGN_MASK)) {
     uint32_t tmp = ai;
@@ -86,8 +122,8 @@ float fadd(float a, float b) {
     bi = tmp;
   }
 
-  FloatingPoint a_fp = unpack_float(ai);
-  FloatingPoint b_fp = unpack_float(bi);
+  fp32 a_fp = unpack_float(ai);
+  fp32 b_fp = unpack_float(bi);
 
   uint32_t align = a_fp.exponent - b_fp.exponent > 24 ? 24 : a_fp.exponent - b_fp.exponent;
   b_fp.mantissa >>= align;
@@ -110,7 +146,7 @@ float fadd(float a, float b) {
 
   uint32_t result = a_fp.sign | (a_fp.exponent << 23) | (a_fp.mantissa & MANTISSA_MASK);
 
-  return *(float*)&result;
+  return *(float *)&result;
 }
 
 int32_t idiv(int32_t a, int32_t b) {
@@ -128,11 +164,11 @@ int32_t idiv(int32_t a, int32_t b) {
 }
 
 float fdiv(float a, float b) {
-  uint32_t ai = *(uint32_t*)&a;
-  uint32_t bi = *(uint32_t*)&b;
+  uint32_t ai = *(uint32_t *)&a;
+  uint32_t bi = *(uint32_t *)&b;
 
-  FloatingPoint a_fp = unpack_float(ai);
-  FloatingPoint b_fp = unpack_float(bi);
+  fp32 a_fp = unpack_float(ai);
+  fp32 b_fp = unpack_float(bi);
 
   a_fp.exponent -= b_fp.exponent;
   a_fp.exponent += EXPONENT_BIAS;
@@ -142,5 +178,5 @@ float fdiv(float a, float b) {
 
   uint32_t result = a_fp.sign | ((a_fp.exponent - shift) << 23) | ((a_fp.mantissa >> 8 << shift) & MANTISSA_MASK);
 
-  return *(float*)&result;
+  return *(float *)&result;
 }

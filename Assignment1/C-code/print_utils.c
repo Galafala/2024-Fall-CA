@@ -1,5 +1,6 @@
 #include "print_utils.h"
 
+#include <stdint.h>
 #include <stdio.h>  // For printf
 
 // Function to print a 32-bit number in binary form (IEEE 754 format style)
@@ -11,6 +12,20 @@ void printBinary(uint32_t num) {
 
     // Print a space after the sign and exponent
     if (i == 31 || i == 23) {
+      printf(" ");
+    }
+  }
+  printf("\n");
+}
+
+void printBinary16(uint32_t num) {
+  for (int i = 15; i >= 0; i--) {
+    uint32_t mask = 1 << i;               // Create a mask to isolate each bit
+    uint32_t bit = (num & mask) ? 1 : 0;  // Isolate the bit at position i
+    printf("%u", bit);
+
+    // Print a space after the sign and exponent
+    if (i == 15 || i == 7) {
       printf(" ");
     }
   }
