@@ -4,33 +4,45 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "float_utils.h"
+#include "bfp16_utils.h"
 #include "print_utils.h"
 
+int seed(bf16 x, bf16 n, bf16 e) {
+  n.s = 0x8000;
+  n.bits &= 0x7FFF;
+  n.bits |= 0x8000;
+  bf16 added = bf16add(bf16square(x), n);
+  added.s = 0;
+  added.bits &= 0x7FFF;
+  return bf16cmp(added, e);
+}
+
 int main() {
-  float num = 49;
+  float num = 88;
+  float error = 0.5;
 
-  float x = fdiv2(num);
+  bf16 n = fp32_to_bf16(*(uint32_t*)&num);
 
-  fp32 fp = unpack_fp32(*(uint32_t*)&x);
-  bfp16 bfp = unpack_bfp16(*(uint32_t*)&x);
+  bf16 x = bf16div2(n);
 
-  printBinary32(pack_fp32(fp));
-  printBinary32(pack_bfp16(bfp));
+  bf16 e = fp32_to_bf16(*(uint32_t*)&error);
 
-  // while (fcmp(fsquare(x), num) == 1) {
-  //   float temp = fdiv(num, x);
-  //   x = fadd(x, temp);
-  //   x = fdiv2(x);
-  // }
+  // bf16 y = bf16square(x);
 
-  // while (fsquare(x) - num > 0.0001) {
-  //   float temp = fdiv(num, x);
-  //   x = fadd(x, temp);
-  //   x = fdiv2(x);
-  // }
+  // float k = bf16_to_fp32(y);
+  // printf("Square: %f\n", k);
+  // fprint(num * num * 0.25);
 
-  printf("Square root: %f\n", x);
+  while (seed(x, n, e) == 1) {
+    bf16 temp = bf16div(n, x);
+    x = bf16add(x, temp);
+    x = bf16div2(x);
+  }
+
+  float a = bf16_to_fp32(x);
+
+  printf("[Important] Square root: %f\n", a);
+  printf("Is perfect square: %s\n", bf16cmp(bf16square(x), n) == 0 ? "true" : "false");
   printf("Square root by built-in function: %f\n", sqrt(num));
 
   return 0;

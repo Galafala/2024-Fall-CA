@@ -7,6 +7,9 @@
 void printBinary(uint32_t num);
 
 // Function to print a 32-bit number in binary form (standard format)
+void printBinary16(uint32_t num);
+
+// Function to print a 32-bit number in binary form (standard format)
 void printBinary32(uint32_t num);
 
 // Function to print a 64-bit number in binary form
