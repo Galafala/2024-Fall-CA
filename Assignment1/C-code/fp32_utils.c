@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
+static inline float getbit32(uint32_t num, int pos) { return (num >> (pos - 1)) & 1; }
+
 fp32 unpack_float(uint32_t num) {
   struct fp32 fp;
 
@@ -22,25 +24,41 @@ static inline int clz32(uint32_t x) {
   return count;
 }
 
-float fdiv2(float n) {
-  uint32_t num = *(uint32_t *)&n;
-
-  num -= 0x00800000;
-
-  return *(float *)&num;
+static inline int cbz32(uint32_t x) {
+  int count = 0;
+  for (int i = 0; i < 32; ++i) {
+    if (x & (1U << i)) break;
+    count++;
+  }
+  return count;
 }
 
-static inline float getbit32(uint32_t num, int pos) { return (num >> (pos - 1)) & 1; }
+uint32_t fp32_to_uint32(float n) {
+  uint32_t num = *(uint32_t *)&n;
+  fp32 fp = unpack_float(num);
+  fp.mantissa += getbit32(num, cbz32(fp.mantissa) + 1);  // Round to the nearest even number
 
-uint32_t imul(uint32_t a, uint32_t b) {
-  uint32_t r = 0;
-  for (int i = 0; i < 24; i++) {
-    uint32_t mask = (b & 1) == 1 ? 0xFFFFFFFF : 0;
-    r = (r >> 1) + (a & mask);
-    b >>= 1;
+  int shift = 23 - (fp.exponent - 127);
+  if (shift > 0) {
+    fp.mantissa >>= shift;
+  } else {
+    fp.mantissa <<= -shift;
   }
 
-  return r;
+  return fp.mantissa;
+}
+
+// Function to compare two floating-point numbers, and only need to handle positive numbers
+int fcmp(float a, float b) {
+  uint32_t ai = *(uint32_t *)&a;
+  uint32_t bi = *(uint32_t *)&b;
+
+  if (ai == bi) {
+    return 0;  // equal
+  } else if (ai > bi) {
+    return 1;  // greater
+  }
+  return 2;  // smaller
 }
 
 float fabsf(float x) {
@@ -55,6 +73,25 @@ float fnegative(float x) {
   i ^= 0x80000000;               // Toggle the sign bit to get the negative value
   x = *(float *)&i;              // Write the modified bits back into the float
   return x;
+}
+
+float fdiv2(float n) {
+  uint32_t num = *(uint32_t *)&n;
+
+  num -= 0x00800000;
+
+  return *(float *)&num;
+}
+
+uint32_t imul(uint32_t a, uint32_t b) {
+  uint32_t r = 0;
+  for (int i = 0; i < 24; i++) {
+    uint32_t mask = (b & 1) == 1 ? 0xFFFFFFFF : 0;
+    r = (r >> 1) + (a & mask);
+    b >>= 1;
+  }
+
+  return r;
 }
 
 float fsquare(float n) {
@@ -73,19 +110,6 @@ float fsquare(float n) {
   num = (n_fp.sign) | (n_fp.exponent << 23) | (n_fp.mantissa);
 
   return *(float *)&num;
-}
-
-// Function to compare two floating-point numbers, and only need to handle positive numbers
-int fcmp(float a, float b) {
-  uint32_t ai = *(uint32_t *)&a;
-  uint32_t bi = *(uint32_t *)&b;
-
-  if (ai == bi) {
-    return 0;  // equal
-  } else if (ai > bi) {
-    return 1;  // greater
-  }
-  return 2;  // smaller
 }
 
 float fadd(float a, float b) {
@@ -155,28 +179,4 @@ float fdiv(float a, float b) {
   uint32_t result = a_fp.sign | ((a_fp.exponent - shift) << 23) | ((a_fp.mantissa >> 8 << shift) & MANTISSA_MASK);
 
   return *(float *)&result;
-}
-
-static inline int cbz32(uint32_t x) {
-  int count = 0;
-  for (int i = 0; i < 32; ++i) {
-    if (x & (1U << i)) break;
-    count++;
-  }
-  return count;
-}
-
-uint32_t fp32_to_uint32(float n) {
-  uint32_t num = *(uint32_t *)&n;
-  fp32 fp = unpack_float(num);
-  fp.mantissa += getbit32(num, cbz32(fp.mantissa) + 1);  // Round to the nearest even number
-
-  int shift = 23 - (fp.exponent - 127);
-  if (shift > 0) {
-    fp.mantissa >>= shift;
-  } else {
-    fp.mantissa <<= -shift;
-  }
-
-  return fp.mantissa;
 }
