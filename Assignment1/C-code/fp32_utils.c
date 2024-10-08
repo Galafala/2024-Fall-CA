@@ -169,15 +169,14 @@ static inline int cbz32(uint32_t x) {
 uint32_t fp32_to_uint32(float n) {
   uint32_t num = *(uint32_t *)&n;
   fp32 fp = unpack_float(num);
-  int shift = 23 - (fp.exponent - 127);
   fp.mantissa += getbit32(num, cbz32(fp.mantissa) + 1);  // Round to the nearest even number
+
+  int shift = 23 - (fp.exponent - 127);
   if (shift > 0) {
     fp.mantissa >>= shift;
   } else {
     fp.mantissa <<= -shift;
   }
-
-  // Calculate the integer value
 
   return fp.mantissa;
 }
