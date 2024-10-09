@@ -1,5 +1,5 @@
-#ifndef FLOAT_UTILS_H
-#define FLOAT_UTILS_H
+#ifndef FP32_UTILS_H
+#define FP32_UTILS_H
 
 #include <stdint.h>  // For uint32_t and int32_t types
 
@@ -10,18 +10,21 @@
 #define EXPONENT_BIAS 127
 #define HIDDEN_BIT 0x00800000
 
+int fcmp(float a, float b);
+float fabsf(float n);
+float fnegative(float n);
 float fdiv2(float n);
 float fsquare(float n);
 float fadd(float a, float b);
 float fdiv(float a, float b);
-int fcmp(float a, float b);
 
-typedef struct FloatingPoint {
+typedef struct fp32 {
   uint32_t sign;
   int32_t exponent;
   int32_t mantissa;
-} FloatingPoint;
+} fp32;
 
-FloatingPoint unpack_float(uint32_t num);
+fp32 unpack_float(uint32_t num);
+uint32_t fp32_to_uint32(float n);
 
 #endif  // FLOAT_ARITHMETIC_H

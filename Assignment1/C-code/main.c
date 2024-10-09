@@ -4,26 +4,32 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "float_utils.h"
+#include "fp32_utils.h"
 #include "print_utils.h"
 
+int condition(float a, float b) {
+  b = fnegative(b);
+  float sum = fadd(fsquare(a), b);
+  sum = fabsf(sum);
+  return fcmp(sum, 0.1) == 1;
+}
+
 int main() {
-  float num = 49;
+  for (float i = 1; i < 100; i++) {
+    float num = fsquare(i);
+    float half = fdiv2(num);
 
-  float x = fdiv2(num);
+    while (condition(half, num)) {
+      half = fadd(half, fdiv(num, half));
+      half = fdiv2(half);
+    }
 
-  while (fcmp(fsquare(x), num) == 1) {
-    float temp = fdiv(num, x);
-    x = fadd(x, temp);
-    x = fdiv2(x);
+    bool is_equal = (num == fsquare(fp32_to_uint32(half)));
+    if (!is_equal) {
+      printf("Is num %d equal to half * half? %s\n", fp32_to_uint32(i), is_equal ? "true" : "false");
+      fprint(half);
+    }
   }
-  // while (fsquare(x) - num > 0.0001) {
-  //   float temp = fdiv(num, x);
-  //   x = fadd(x, temp);
-  //   x = fdiv2(x);
-  // }
-  printf("Square root: %f\n", x);
-  printf("Square root: %f\n", sqrt(num));
 
   return 0;
 }
