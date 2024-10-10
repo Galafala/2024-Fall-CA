@@ -15,7 +15,7 @@ int condition(float a, float b) {
 }
 
 int main() {
-  for (float i = 1; i < 100; i++) {
+  for (float i = 1; i < 1000; i++) {
     float num = i;
     float half = fdiv2(num);
 
@@ -24,8 +24,11 @@ int main() {
       half = fdiv2(half);
     }
 
-    bool is_equal = (num == fsquare(fp32_to_uint32(half)));
+    half = fp32_to_uint32(half);
+
+    bool is_equal = (num == fsquare(half));
     if (is_equal) {
+      printf("i: %f. ", half);
       printf("Is num %d a perfect square? %s\n", fp32_to_uint32(i), is_equal ? "True" : "False");
     }
   }
