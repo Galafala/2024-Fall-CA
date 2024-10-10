@@ -14,30 +14,9 @@
 # }
 
 fdiv2:
-  addi sp, sp, -4
-  sw ra, 0(sp)
-
-  lw t0, 0(a0)
-  addi t0, t0, -0x00800000
-
-  sw t0, 0(sp)
-  lw t0, 0(sp)
-
-  lw ra, 0(sp)
-  addi sp, sp, 4
-
-fdiv2:
-  addi sp, sp, -4
-  sw ra, 0(sp)
-
-  lw s0, 0(a0)
-  addi s0, s0, -0x00800000
-
-  sw s0, 0(sp)
-  lw s0, 0(sp)
-
-  lw ra, 0(sp)
-  addi sp, sp, 4
+  li t0, 0x00800000
+  li a0, 0x3f800000
+  sub a0, a0, t0
 
 
 
