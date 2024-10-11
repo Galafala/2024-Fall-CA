@@ -1,129 +1,82 @@
 .data
-str1: .asciz "\nThe positive number of "
-str2: .asciz " is "
-str3: .asciz "\nThe number of leading zero of "
+str1: .asciz "'s leading zero "
+str2: .asciz "is "
+str3: .asciz "\nThe number of "
 
 .text
 .globl main
 
 main:
-    addi sp, sp, -24
-    li t0, 0xc2440000
-    sw t0, 0(sp)
-    li t0, 0x001f0456
-    sw t0, 4(sp)
-    li t0, 0x80000000
-    sw t0, 8(sp)
-    li t0, 0x00000001
-    sw t0, 12(sp)
-    li t0, 0x8cc0ffff
-    sw t0, 16(sp)
-    li t0, 0x00f00001
-    sw t0, 20(sp)
-    addi sp, sp, 24
-    li s3, -24
-    li s4, 24
+  li t0, 0xc2440000
+  sw t0, 0(s0)
+  li t0, 0x1f0456
+  sw t0, 4(s0)
+  li t0, 0x80000000
+  sw t0, 8(s0)
+  li t0, 0x1
+  sw t0, 12(s0)
+  li t0, 0x0
+  sw t0, 16(s0)
+  li t0, 0xf00001
+  sw t0, 20(s0)
+  li s1, 6
   
 main_loop:
-    add sp, sp, s3
-    lw s0, 0(sp) 
-    lw s1, 4(sp)
-    add sp, sp, s4
-    
-    addi s3, s3, 8
-    addi s4, s4, -8
-    
-    # call function part
-    addi sp, sp, -36
-    
-    jal ra, fabsf
-        
-    
+  # call function part
+  lw a3, 0(s0) # a3 = a[i]
+  addi sp, sp, -8
+  bnez a3, none_zero
+  zero:
+    li a3, 32
+    sw a3, 4(sp)
+    jal ra, end
+  none_zero:
     jal ra, clz32
- 
+  end:
     jal ra, print
-    
-    addi sp, sp, 36
-    
-    # loop the next test data
-    bnez s4, main_loop
-    
-    # exit
+    addi sp, sp, 8
+    addi s0, s0, 4 # a[i+1]
+    addi s1, s1, -1 # s1 -= 1
+    bnez s1, main_loop # if s1 != 0, loop the next test data
+  exit:
     li a7, 93     
     ecall
-           
-
-fabsf:
-    li t0, 0x7fffffff
-    and a0, s0, t0
-    
-    # Store the result into stack
-    mv t1, a0
-    sw t1, 4(sp)
- 
-    jalr zero, ra, 0
     
 clz32:
-    sw ra, 0(sp)
-    li t0, 31 # int i = 31
-    li t2, 0 # count
- 
-    jal ra, clz32_loop
-    
-    addi t2, t2, -1 # count--
-    sw t2, 8(sp)
-    
-    lw ra, 0(sp)
-    jalr zero, ra, 0
-
-clz32_loop:
+  sw ra, 0(sp)
+  li t2, 0 # count
+  li t0, 31 # int i = 31
+  clz32_loop:
     li t1, 1 # 1U
     sll t1, t1, t0 # (1U << i)
-    and t3, s1, t1 # x & (1U << i)
+    and t3, a3, t1 # x & (1U << i)
     addi t0, t0, -1 # i--
     addi t2, t2, 1 # count++
     beqz t3, clz32_loop # if(x & (1U << i)) == 0 (false)
-    jalr zero, ra, 0
+  addi t2, t2, -1 # count--
+  sw t2, 4(sp)
+  lw ra, 0(sp)
+  jalr zero, ra, 0
 
 print:
-    li a0, 1
-    la a1, str1
-    li a2, 24 # String length
-    li a7, 64 # Print string syscall number  
-    ecall
-    
-    mv a0, s0
-    li a7, 34
-    ecall
- 
-    li a0, 1
-    la a1, str2 #is
-    li a2, 4
-    li a7, 64 # Print string syscall number
-    ecall
- 
-    lw a0, 4(sp)
-    li a7, 34
-    ecall
- 
-    li a0, 1
-    la a1, str3
-    li a2, 31
-    li a7, 64 # Print string syscall number
-    ecall
-    
-    mv a0, s1
-    li a7, 34
-    ecall
-    
-    li a0, 1
-    la a1, str2 # is
-    li a2, 4
-    li a7, 64 # Print string syscall number
-    ecall
- 
-    lw a0, 8(sp)
-    li a7, 34
-    ecall
-    
-    jalr zero, ra, 0
+  la a0, str3 # "\nThe number of "
+  li a7, 4 # Print string syscall number
+  ecall
+  
+  mv a0, a3 # test data
+  li a7, 35 # Print binary syscall number
+  ecall
+
+  la a0, str1 # "'s leading zero "
+  li a7, 4 # Print string syscall number
+  ecall
+  
+  la a0, str2 # "is "
+  li a7, 4 # Print string syscall number
+  ecall
+
+  lw a0, 4(sp) # clz answer
+  li a7, 1 # Print integer syscall number
+  ecall
+  
+  jalr zero, ra, 0
