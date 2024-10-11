@@ -23,7 +23,6 @@ init:
   li s1, 6 # test data number
   addi sp, sp, -4 # save sp
 main_loop:
-  # call function part
   lw a3, 0(s0) # a3 = a[i]
   jal ra, clz32 # call clz32 function
   jal ra, print # call print function
@@ -36,7 +35,7 @@ exit:
   ecall
 clz32:
   bnez a3, none_zero # if a3 != 0, jump to none_zero
-  zero:
+  is_zero:
     li t0, 32 # a3 = 32
     sw t0, 0(sp) # save the clz answer
     jalr zero, ra, 0 # return
