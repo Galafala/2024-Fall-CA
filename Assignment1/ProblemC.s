@@ -2,6 +2,7 @@
 str1: .asciz "'s leading zero "
 str2: .asciz "is "
 str3: .asciz "\nThe number of "
+str4: .asciz "undefined"
 
 .text
 .globl main
@@ -9,7 +10,7 @@ str3: .asciz "\nThe number of "
 main:
   li t0, 0
   sw t0, 0(s0)
-  li t0, 0x1f0456
+  li t0, 0x345
   sw t0, 4(s0)
   li t0, 0x80000000
   sw t0, 8(s0)
@@ -21,11 +22,12 @@ main:
   sw t0, 20(s0)
 init:
   li s1, 6 # test data number
+  li s2, 32 # undefined number
   addi sp, sp, -4 # save sp
 main_loop:
   lw a3, 0(s0) # a3 = a[i]
   jal ra, clz32 # call clz32 function
-  jal ra, print # call print function
+  jal ra, print
   addi s0, s0, 4 # a[i+1]
   addi s1, s1, -1 # s1 -= 1
   bnez s1, main_loop # if s1 != 0, loop the next test data
@@ -65,7 +67,15 @@ print:
   la a0, str2 # "is "
   li a7, 4 # Print string syscall number
   ecall
-  lw a0, 0(sp) # clz answer
-  li a7, 1 # Print integer syscall number
-  ecall  
-  jalr zero, ra, 0
+  lw a4, 0(sp)
+  beq a4, s2, undifine
+  difine:
+    lw a0, 0(sp) # clz answer
+    li a7, 1 # Print integer syscall number
+    ecall
+    jalr zero, ra, 0
+  undifine:
+    la a0, str4 # "\nThe number of "
+    li a7, 4 # Print string syscall number
+    ecall
+    jalr zero, ra, 0   
