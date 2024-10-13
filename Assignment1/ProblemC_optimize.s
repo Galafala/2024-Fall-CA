@@ -36,24 +36,36 @@ exit:
   li a7, 93 # exit syscall number
   ecall
 clz32:
-  bnez a3, none_zero # if a3 != 0, jump to none_zero
-  is_zero:
-    li t0, 32 # a3 = 32
-    sw t0, 0(sp) # save the clz answer
-    jalr zero, ra, 0 # return
-  none_zero:
-    li t2, 0 # count
-    li t0, 31 # int i = 31
-  clz32_loop:
-    li t1, 1 # 1U
-    sll t1, t1, t0 # (1U << i)
-    and t3, a3, t1 # x & (1U << i)
-    addi t0, t0, -1 # i--
-    addi t2, t2, 1 # count++
-    beqz t3, clz32_loop # if(x & (1U << i)) == 0 (false)
-    addi t2, t2, -1 # count--
-    sw t2, 0(sp) # save count
-    jalr zero, ra, 0 # return
+  li t0, 0 # r = 0
+  mv t3, a3 # t3 = a3  
+  li t2, 0x00010000
+  sltu t1, t3, t2 # c = (x < 0x00010000) ? 1 : 0
+  slli t1, t1, 4 # c = (x < 0x00010000) << 4
+  add t0, t0, t1 # r += c
+  sll t3, t3, t1 # x <<= c  
+  li t2, 0x01000000
+  sltu t1, t3, t2 # c = (x < 0x01000000) ? 1 : 0
+  slli t1, t1, 3 # c = (x < 0x01000000) << 3
+  add t0, t0, t1 # r += c
+  sll t3, t3, t1 # x <<= c  
+  li t2, 0x10000000
+  sltu t1, t3, t2 # c = (x < 0x01000000) ? 1 : 0
+  slli t1, t1, 2 # c = (x < 0x01000000) << 2
+  add t0, t0, t1 # r += c
+  sll t3, t3, t1 # x <<= c  
+  li t2, 0x40000000
+  sltu t1, t3, t2 # c = (x < 0x01000000) ? 1 : 0
+  slli t1, t1, 1 # c = (x < 0x01000000) << 1
+  add t0, t0, t1 # r += c
+  sll t3, t3, t1 # x <<= c  
+  li t2, 0x80000000
+  sltu t1, t3, t2 # c = (x < 0x01000000) ? 1 : 0
+  add t0, t0, t1 # r += c
+  sll t3, t3, t1 # x <<= c  
+  sltiu t1, t3, 1
+  add t0, t0, t1  
+  sw t0, 0(sp)
+  jalr zero, ra, 0
 print:
   la a0, str3 # "\nThe number of "
   li a7, 4 # Print string syscall number
