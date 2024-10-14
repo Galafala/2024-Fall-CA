@@ -1,5 +1,3 @@
-#include <stdint.h>
-
 #include "stdint.h"
 #include "stdio.h"
 
@@ -14,7 +12,7 @@ void printBinary32(uint32_t n) {
 }
 
 // orignial clz version
-static inline int clz(uint32_t x) {
+static inline int clz_org(uint32_t x) {
   int count = 0;
   for (int i = 31; i >= 0; --i) {
     if (x & (1U << i)) break;
@@ -24,7 +22,7 @@ static inline int clz(uint32_t x) {
 }
 
 // optimized clz version
-static inline int clz32(uint32_t x) {
+static inline int clz_opt(uint32_t x) {
   int r = 0, c;
   c = (x < 0x00010000) << 4;
   r += c;
@@ -47,7 +45,7 @@ static inline int clz32(uint32_t x) {
 
 int main() {
   uint32_t x = 0x00001;
-  uint32_t r = clz32(x);
+  uint32_t r = clz_opt(x);
   printf("r: %d\n", r);
   printBinary32(x);
   return 0;
